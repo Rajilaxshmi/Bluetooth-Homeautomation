@@ -1,0 +1,177 @@
+#include<lpc21xx.h>
+#include "4bit.h"
+#define LED 1<<8
+#define FAN 1<<9|1<<10
+void UART0_CONFIG(void);
+void UART0_TX(unsigned char);
+unsigned char UART0_RX(void);
+int main()
+{
+ 
+  unsigned char x;
+  IODIR0|=LED|FAN;
+  IOSET0=LED;
+  IOCLR0=FAN;
+  lcd_init();
+  str("HOME AUTOMATION");
+  UART0_CONFIG();
+  while(1)
+  {
+  x=UART0_RX();
+  if(x=='1')
+  {
+IOCLR0=LED;
+lcd_cmd(0xC0);
+str("LED ON");
+}
+  else if(x=='2')
+  {
+   IOSET0=FAN;
+   lcd_cmd(0xC0);
+   str("FAN ON");
+   }
+   else if(x=='3')
+   {
+    IOSET0=LED;
+    lcd_cmd(0xC0);
+str("LED OFF");
+}
+else if(x=='4')
+{
+IOCLR0=FAN;
+lcd_cmd(0xC0);
+str("FAN OFF");
+}
+/*else
+{
+   lcd_cmd(0xC0);
+   str("INVALID OPTION");
+} */
+  }
+ }
+ void UART0_CONFIG(void)
+ {
+  PINSEL0=0X00000005;
+  U0LCR=0X83;
+  U0DLL=97;
+  U0LCR=0X03;
+  }
+void UART0_TX(unsigned char d)
+  {
+   while((U0LSR&(1<<5))==0);
+   U0THR=d;
+   }
+unsigned char UART0_RX(void)
+  {
+   while((U0LSR&(1<<5))==0);
+   return U0RBR;
+   }
+/*4bit.c*/
+#include<LPC21xx.h>
+#define lcd_d 0xf<<4
+#define rs 1<<12
+//#define rw 1<<18
+#define e 1<<13
+
+typedef unsigned int U32;
+typedef unsigned char U8;
+typedef signed char S8;
+typedef float F32;
+
+
+void delay_milliseconds(U32 milliseconds)
+{
+//T0CTCR=0X00;
+T0PR = 15000-1;
+T0TCR = 0X01;
+while(T0TC<milliseconds);
+T0TCR = 0x03;
+T0TCR = 0x00;
+}
+
+void lcd_cmd(U8 d)
+{
+   IOCLR0=lcd_d;
+IOSET0 = (d&0xf0);
+IOCLR0 = rs;
+//IOCLR0 = rw;
+IOSET0 =e;
+delay_milliseconds(2);
+IOCLR0 =e;
+
+IOCLR0=lcd_d;
+IOSET0 = (d&0x0F)<<4;
+IOCLR0 = rs;
+//IOCLR0 = rw;
+IOSET0 =e;
+delay_milliseconds(2);
+IOCLR0 =e;
+}
+
+void lcd_data(U8 d)
+{
+
+IOCLR0=lcd_d;
+IOSET0 = (d&0xf0);
+IOSET0 = rs;
+//IOCLR0 = rw;
+IOSET0 =e;
+delay_milliseconds(2);
+IOCLR0 =e;
+
+IOCLR0=lcd_d;
+IOSET0 = (d&0x0F)<<4;
+IOSET0 = rs;
+//IOCLR0 = rw;
+IOSET0 =e;
+delay_milliseconds(2);
+IOCLR0 =e;
+}
+
+void lcd_init(void)
+{
+IODIR0 |= lcd_d|rs|e;
+lcd_cmd(0x01);
+lcd_cmd(0x02);
+lcd_cmd(0x0c);
+lcd_cmd(0x28);
+lcd_cmd(0x80);
+}
+
+void str(U8 *s)
+{
+while(*s)
+lcd_data(*s++);
+}
+
+void lcd_integer(int n)
+{
+S8 arr[5],i=0;
+if(n==0)
+lcd_data('0');
+else
+{
+  if(n<0)
+  {
+lcd_data('-');
+n=-n;
+       }
+     while(n>0)
+      {
+    arr[i++]=n%10;
+    n=n/10;
+        }
+        for(--i;i>=0;i--)
+         lcd_data(arr[i]+48);
+  }
+}
+void Float_display(F32 f_val)
+{
+  U32 number;
+  number = f_val;
+  lcd_integer(number);
+  lcd_data('.');
+  number=(f_val-number)*100;
+  lcd_integer(number);
+}
+
